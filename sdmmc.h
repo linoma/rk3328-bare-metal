@@ -1,0 +1,125 @@
+#include "main.h"
+
+#ifndef __SDMMCH__
+#define __SDMMCH__
+
+#define SDMMC_CTRL		0x000
+#define SDMMC_PWREN		0x004
+#define SDMMC_CLKDIV		0x008
+#define SDMMC_CLKSRC		0x00c
+#define SDMMC_CLKENA		0x010
+#define SDMMC_TMOUT		0x014
+#define SDMMC_CTYPE		0x018
+#define SDMMC_BLKSIZ		0x01c
+#define SDMMC_BYTCNT		0x020
+#define SDMMC_INTMASK		0x024
+#define SDMMC_CMDARG		0x028
+#define SDMMC_CMD		0x02c
+#define SDMMC_RESP0		0x030
+#define SDMMC_RESP1		0x034
+#define SDMMC_RESP2		0x038
+#define SDMMC_RESP3		0x03c
+#define SDMMC_MINTSTS		0x040
+#define SDMMC_RINTSTS		0x044
+#define SDMMC_STATUS		0x048
+#define SDMMC_FIFOTH		0x04c
+#define SDMMC_CDETECT		0x050
+#define SDMMC_WRTPRT		0x054
+#define SDMMC_GPIO		0x058
+#define SDMMC_TCBCNT		0x05c
+#define SDMMC_TBBCNT		0x060
+#define SDMMC_DEBNCE		0x064
+#define SDMMC_USRID		0x068
+#define SDMMC_VERID		0x06c
+#define SDMMC_HCON		0x070
+#define SDMMC_UHS_REG		0x074
+#define SDMMC_BMOD		0x080
+#define SDMMC_PLDMND		0x084
+#define SDMMC_DBADDR		0x088
+#define SDMMC_IDSTS		0x08c
+#define SDMMC_IDINTEN		0x090
+#define SDMMC_DSCADDR		0x094
+#define SDMMC_BUFADDR		0x098
+#define SDMMC_CDTHRCTL		0x100
+#define SDMMC_DATA(x)		(x)
+
+#define DMA_INTERFACE_IDMA		(0x0)
+#define DMA_INTERFACE_DWDMA		(0x1)
+#define DMA_INTERFACE_GDMA		(0x2)
+#define DMA_INTERFACE_NODMA		(0x3)
+
+#define SDMMC_GET_TRANS_MODE(x)		(((x)>>16) & 0x3)
+#define SDMMC_GET_SLOT_NUM(x)		((((x)>>1) & 0x1F) + 1)
+#define SDMMC_GET_HDATA_WIDTH(x)	(((x)>>7) & 0x7)
+#define SDMMC_GET_ADDR_CONFIG(x)	(((x)>>27) & 0x1)
+#define SDMMC_GET_VERID(x)			((x) & 0xFFFF)
+#define SDMMC_SET_RD_THLD(v, x)		(((v) & 0xFFF) << 16 | (x))
+
+#define SDMMC_SET_FIFOTH(m, r, t)	(((m) & 0x7) << 28 | ((r) & 0xFFF) << 16 | ((t) & 0xFFF))
+
+#define DW_MCI_DATA_ERROR_FLAGS	(SDMMC_INT_DRTO | SDMMC_INT_DCRC | SDMMC_INT_HTO | SDMMC_INT_SBE  |  SDMMC_INT_EBE | SDMMC_INT_HLE)
+#define DW_MCI_CMD_ERROR_FLAGS	(SDMMC_INT_RTO | SDMMC_INT_RCRC | SDMMC_INT_RESP_ERR | SDMMC_INT_HLE)
+#define DW_MCI_ERROR_FLAGS	(DW_MCI_DATA_ERROR_FLAGS | DW_MCI_CMD_ERROR_FLAGS)
+#define DW_MCI_SEND_STATUS	1
+#define DW_MCI_RECV_STATUS	2
+#define DW_MCI_DMA_THRESHOLD	16
+
+#define DW_MCI_FREQ_MAX	200000000	/* unit: HZ */
+#define DW_MCI_FREQ_MIN	100000		/* unit: HZ */
+
+#define IDMAC_INT_CLR		(SDMMC_IDMAC_INT_AI | SDMMC_IDMAC_INT_NI | \
+				 SDMMC_IDMAC_INT_CES | SDMMC_IDMAC_INT_DU | \
+				 SDMMC_IDMAC_INT_FBE | SDMMC_IDMAC_INT_RI | \
+				 SDMMC_IDMAC_INT_TI)
+
+#define DATA_OFFSET			0x100
+#define DATA_240A_OFFSET	0x200
+
+#define SDMMC_CTRL_USE_IDMAC		BIT(25)
+#define SDMMC_CTRL_CEATA_INT_EN		BIT(11)
+#define SDMMC_CTRL_SEND_AS_CCSD		BIT(10)
+#define SDMMC_CTRL_SEND_CCSD		BIT(9)
+#define SDMMC_CTRL_ABRT_READ_DATA	BIT(8)
+#define SDMMC_CTRL_SEND_IRQ_RESP	BIT(7)
+#define SDMMC_CTRL_READ_WAIT		BIT(6)
+#define SDMMC_CTRL_DMA_ENABLE		BIT(5)
+#define SDMMC_CTRL_INT_ENABLE		BIT(4)
+#define SDMMC_CTRL_DMA_RESET		BIT(2)
+#define SDMMC_CTRL_FIFO_RESET		BIT(1)
+#define SDMMC_CTRL_RESET		BIT(0)
+
+#define SDMMC_INT_SDIO(n)		BIT(16 + (n))
+#define SDMMC_INT_EBE			BIT(15)
+#define SDMMC_INT_ACD			BIT(14)
+#define SDMMC_INT_SBE			BIT(13)
+#define SDMMC_INT_HLE			BIT(12)
+#define SDMMC_INT_FRUN			BIT(11)
+#define SDMMC_INT_HTO			BIT(10)
+#define SDMMC_INT_VSI           SDMMC_INT_HTO
+#define SDMMC_INT_DRTO			BIT(9)
+#define SDMMC_INT_RTO			BIT(8)
+#define SDMMC_INT_DCRC			BIT(7)
+#define SDMMC_INT_RCRC			BIT(6)
+#define SDMMC_INT_RXDR			BIT(5)
+#define SDMMC_INT_TXDR			BIT(4)
+#define SDMMC_INT_DATA_OVER		BIT(3)
+#define SDMMC_INT_CMD_DONE		BIT(2)
+#define SDMMC_INT_RESP_ERR		BIT(1)
+#define SDMMC_INT_CD			BIT(0)
+#define SDMMC_INT_ERROR			0xbfc2
+
+
+#define SDMMC_IDMAC_INT_AI		BIT(9)
+#define SDMMC_IDMAC_INT_NI		BIT(8)
+#define SDMMC_IDMAC_INT_CES		BIT(5)
+#define SDMMC_IDMAC_INT_DU		BIT(4)
+#define SDMMC_IDMAC_INT_FBE		BIT(2)
+#define SDMMC_IDMAC_INT_RI		BIT(1)
+#define SDMMC_IDMAC_INT_TI		BIT(0)
+#define SDMMC_IDMAC_ENABLE		BIT(7)
+#define SDMMC_IDMAC_FB			BIT(1)
+#define SDMMC_IDMAC_SWRESET		BIT(0)
+
+int sdmmc_init();
+
+#endif

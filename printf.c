@@ -1,8 +1,6 @@
 #include "uart.h"
 #include "main.h"
 
-extern volatile unsigned char _end;
-
 unsigned int vsprintf(char *dst, char* fmt, __builtin_va_list args){
     s64 arg;
     int len, sign, i,lf;
@@ -109,7 +107,7 @@ unsigned int sprintf(char *dst, char* fmt, ...){
 void printf(char *fmt, ...) {
 	__builtin_va_list args;
     __builtin_va_start(args, fmt);
-    char *s = (char*)&_end;
+    char *s = (char*)_mem;
     vsprintf(s,fmt,args);
     while(*s) {
         if(*s=='\n')

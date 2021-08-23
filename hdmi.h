@@ -313,6 +313,34 @@
 #define HDMI_GP_MASK                            0x3505
 #define HDMI_GP_POL                             0x3506
 
+
+#define HDMI_CSC_CFG                            0x4100
+#define HDMI_CSC_SCALE                          0x4101
+#define HDMI_CSC_COEF_A1_MSB                    0x4102
+#define HDMI_CSC_COEF_A1_LSB                    0x4103
+#define HDMI_CSC_COEF_A2_MSB                    0x4104
+#define HDMI_CSC_COEF_A2_LSB                    0x4105
+#define HDMI_CSC_COEF_A3_MSB                    0x4106
+#define HDMI_CSC_COEF_A3_LSB                    0x4107
+#define HDMI_CSC_COEF_A4_MSB                    0x4108
+#define HDMI_CSC_COEF_A4_LSB                    0x4109
+#define HDMI_CSC_COEF_B1_MSB                    0x410A
+#define HDMI_CSC_COEF_B1_LSB                    0x410B
+#define HDMI_CSC_COEF_B2_MSB                    0x410C
+#define HDMI_CSC_COEF_B2_LSB                    0x410D
+#define HDMI_CSC_COEF_B3_MSB                    0x410E
+#define HDMI_CSC_COEF_B3_LSB                    0x410F
+#define HDMI_CSC_COEF_B4_MSB                    0x4110
+#define HDMI_CSC_COEF_B4_LSB                    0x4111
+#define HDMI_CSC_COEF_C1_MSB                    0x4112
+#define HDMI_CSC_COEF_C1_LSB                    0x4113
+#define HDMI_CSC_COEF_C2_MSB                    0x4114
+#define HDMI_CSC_COEF_C2_LSB                    0x4115
+#define HDMI_CSC_COEF_C3_MSB                    0x4116
+#define HDMI_CSC_COEF_C3_LSB                    0x4117
+#define HDMI_CSC_COEF_C4_MSB                    0x4118
+#define HDMI_CSC_COEF_C4_LSB                    0x4119
+
 #define HDMI_A_HDCPCFG0                         0x5000
 #define HDMI_A_HDCPCFG1                         0x5001
 #define HDMI_A_HDCPOBS0                         0x5002

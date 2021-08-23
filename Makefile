@@ -24,7 +24,10 @@
 #
 
 SRCS = $(wildcard *.c)
+#SRCS += $(wildcard *.S)
 OBJS = $(SRCS:.c=.o)
+OBJS += cache.o
+
 CFLAGS = -Wno-int-to-pointer-cast -O2 -ffreestanding -fno-stack-protector -nostdinc -nostdlib -nostartfiles -march=armv8-a
 TARGET_USER	= kernel.elf
 TARGET_KERN = kernel
@@ -32,6 +35,7 @@ TARGET_KERN = kernel
 all: clean kernel.bin
 
 %.o: %.S
+	@echo Assemblling  $< ...
 	@aarch64-linux-gnu-gcc $(CFLAGS) -c $< -o $@
 
 %.o: %.c

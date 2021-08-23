@@ -25,7 +25,10 @@ typedef signed short __le16;
 #define HDMI_BASE 					0xFF3C0000
 #define GPU_BASE 					0xFF300000 //0xffa30000 ff300000
 #define HDMIPHY_BASE				0xFF430000
-
+#define SDMMC_BASE					0xff500000
+#define SDIO_BASE					0xff510000
+#define EMMC_BASE					0xff520000
+#define GIC_BASE					0xff811000
 
 #define __nops(n)	".rept	" #n "\nnop\n.endr\n"
 #define nops(n)		asm volatile(__nops(n))
@@ -41,10 +44,10 @@ typedef signed short __le16;
 s64 __div(s64 v,s64 d);
 u64 get_cycles(void);
 void udelay(u32 usec);
+extern void __flush_dcache_area(void *addr, u32 len);
 
-
-extern volatile u8 _end;
-extern volatile u8 _data;
-
+extern u8 *_mem;
+extern u32 _usec_factor;
+extern u32 _msec_factor;
 
 #endif

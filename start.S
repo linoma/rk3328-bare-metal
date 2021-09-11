@@ -23,6 +23,8 @@
  *
  */
 
+#include "mmu.h"
+
 .macro	switch_el, xreg, el3_label, el2_label, el1_label
 	mrs	\xreg, CurrentEL
 	cmp	\xreg, 0xc
@@ -33,37 +35,62 @@
 	b.eq	\el1_label
 .endm
 
-.macro armv8_switch_to_el1_m, xreg1, xreg2
-	mrs	\xreg1, cnthctl_el2
-	orr	\xreg1, \xreg1, #0x3
-	msr	cnthctl_el2, \xreg1
+.macro armv8_switch_to_el1_m, ep, flag, tmp
+	mrs	\tmp, cnthctl_el2
+	orr	\tmp, \tmp, #(CNTHCTL_EL2_EL1PCEN_EN | CNTHCTL_EL2_EL1PCTEN_EN )
+	orr	\tmp, \tmp, #(1<<10)
+	orr	\tmp, \tmp, #(1<<11)
+	msr	cnthctl_el2, \tmp
 	msr	cntvoff_el2, xzr
 
-	mrs	\xreg1, midr_el1
-	mrs	\xreg2, mpidr_el1
-	msr	vpidr_el2, \xreg1
-	msr	vmpidr_el2, \xreg2
+	mrs	\tmp, midr_el1
+	msr	vpidr_el2, \tmp
+	mrs	\tmp, mpidr_el1
+	msr	vmpidr_el2, \tmp
 
-	mov	\xreg1, #0x33ff
-	msr	cptr_el2, \xreg1
+	mov	\tmp, #CPTR_EL2_RES1
+	msr	cptr_el2, \tmp
 	msr	hstr_el2, xzr
-	mov	\xreg1, #3 << 20
-	msr	cpacr_el1, \xreg1
+	mov	\tmp, #CPACR_EL1_FPEN_EN
+	msr	cpacr_el1, \tmp
 
-	mov	\xreg1, #(1 << 31)|(1<<29)
-	msr	hcr_el2, \xreg1
+	#msr ttbr0_el2, \tmp
+	#mrs \tmp, ttbr0_el1
+	#msr ttbr1_el2, \tmp
+	#mrs \tmp, ttbr1_el1
 
-	mov	\xreg1, #0x0800
-	movk \xreg1, #0x30d0, lsl #16
-	msr	sctlr_el1, \xreg1
+	ldr	\tmp, =(SCTLR_EL1_RES1 | SCTLR_EL1_UCI_DIS | SCTLR_EL1_EE_LE | SCTLR_EL1_WXN_DIS | SCTLR_EL1_NTWE_DIS | SCTLR_EL1_NTWI_DIS | \
+			SCTLR_EL1_UCT_DIS | SCTLR_EL1_DZE_DIS |	SCTLR_EL1_ICACHE_DIS | SCTLR_EL1_UMA_DIS | SCTLR_EL1_SED_EN | SCTLR_EL1_ITD_EN | \
+			SCTLR_EL1_CP15BEN_DIS | SCTLR_EL1_SA0_DIS | SCTLR_EL1_SA_DIS | SCTLR_EL1_DCACHE_DIS | SCTLR_EL1_ALIGN_DIS | SCTLR_EL1_MMU(0))
+	msr	sctlr_el1, \tmp
 
-	mov	\xreg1, #0x3c5
-	msr	spsr_el2, \xreg1
-	adr	\xreg1, 9f
-	msr	elr_el2, \xreg1
+	mov	\tmp, sp
+	msr	sp_el1, \tmp
+	mrs	\tmp, vbar_el2
+	msr	vbar_el1, \tmp
+
+	cmp	\flag, #ES_TO_AARCH32
+	b.eq	1f
+
+	ldr	\tmp, =(HCR_EL2_RW_AARCH64 | HCR_EL2_HCD_DIS)
+	msr	hcr_el2, \tmp
+
+	ldr	\tmp, =(SPSR_EL_DEBUG_MASK | SPSR_EL_SERR_MASK | SPSR_EL_IRQ_MASK | SPSR_EL_FIQ_MASK | SPSR_EL_M_AARCH64 | SPSR_EL_M_EL1H)
+	msr	spsr_el2, \tmp
+	msr elr_el2, \ep
 	eret
-9:
-	.endm
+1:
+	ldr	\tmp, =(HCR_EL2_RW_AARCH32 | HCR_EL2_HCD_DIS)
+	msr	hcr_el2, \tmp
+
+	ldr	\tmp, =(SPSR_EL_END_LE | SPSR_EL_ASYN_MASK |\
+			SPSR_EL_IRQ_MASK | SPSR_EL_FIQ_MASK |\
+			SPSR_EL_T_A32 | SPSR_EL_M_AARCH32 |\
+			SPSR_EL_M_SVC)
+	msr     spsr_el2, \tmp
+	msr     elr_el2, \ep
+	eret
+.endm
 
 .section ".text.boot"
 
@@ -71,26 +98,30 @@
 _start:
 	mrs   x1, mpidr_el1
 	and   x1, x1, #3
-    cbz   x1, 1f
+    cbz   x1, 2f
     // cpu id > 0, stop
-4:  wfe
-    b     4b
+1:  wfe
+    b     1b
+2:
+	ldr	x5, =ES_TO_AARCH64
+	ldr	x4, =_entry
+	armv8_switch_to_el1_m x4, x5, x6
 
-1:	ldr	  x0, =_vectors
-	msr	  vbar_el2, x0
+_entry:
+	ldr	  x0, =_vectors
+	msr	  vbar_el1, x0
 	ldr	  x0, =_start
 	mov	  sp, x0
 
     ldr   x1, =__bss_start
     ldr   w2, =__bss_size
-4:  cbz   w2, 5f
+5:  cbz   w2, 6f
     str   xzr, [x1], #8
     sub   w2, w2, #1
-    cbnz  w2, 4b
+    cbnz  w2, 5b
 
-5:	msr   daifclr, #15
-	bl    main
-    b     5b
+6:	bl    main
+    b     6b
 
     .align 11
     .globl	_vectors
@@ -98,43 +129,56 @@ _vectors:
 	.align 7
     b	UnexpectedStub
 	.align 7
-	b	UnexpectedStub
+	b	IRQStub
 	.align 7
-	b	UnexpectedStub
-	.align 7
-	b	UnexpectedStub
-
-	.align 7
-    b	UnexpectedStub
-	.align 7
-	b	UnexpectedStub
-	.align 7
-	b	UnexpectedStub
+	b	FIQStub
 	.align 7
 	b	UnexpectedStub
 
 	.align 7
     b	UnexpectedStub
 	.align 7
-	b	UnexpectedStub
+	b	IRQStub
 	.align 7
-	b	UnexpectedStub
-	.align 7
-	b	UnexpectedStub
-
-	.align 7
-    b	UnexpectedStub
-	.align 7
-	b	UnexpectedStub
-	.align 7
-	b	UnexpectedStub
+	b	FIQStub
 	.align 7
 	b	UnexpectedStub
 
-.globl	UnexpectedStub
+	.align 7
+    b	EmptyStub
+	.align 7
+	b	EmptyStub
+	.align 7
+	b	EmptyStub
+	.align 7
+	b	EmptyStub
+
+	.align 7
+    b	EmptyStub
+	.align 7
+	b	EmptyStub
+	.align 7
+	b	EmptyStub
+	.align 7
+	b	EmptyStub
+
+FIQStub:
+	bl	_exception_entry
+	bl gic_fiq_handler
+	b 	_exception_exit
+
+IRQStub:
+	bl	_exception_entry
+	bl gic_irq_handler
+	b 	_exception_exit
+
 UnexpectedStub:
 	bl	_exception_entry
 	bl  exc_handler
+	b 	_exception_exit
+
+EmptyStub:
+	bl	_exception_entry
 	b 	_exception_exit
 
 _exception_entry:
@@ -154,15 +198,15 @@ _exception_entry:
 	stp	x3, x4, [sp, #-16]!
 	stp	x1, x2, [sp, #-16]!
 
-	mrs	x1, esr_el2
-	mrs	x2, elr_el2
+	mrs	x1, spsr_el1
+	mrs	x2, elr_el1
 	mrs	x3, daif
-	mrs	x4, vbar_el2
-	mrs	x5, spsr_el2
+	mrs	x4, vbar_el1
+	mrs	x5, esr_el1
 	sub	x6, sp, #(8*30)
-	mrs	x7, sctlr_el2
-	mrs	x8, hcr_el2
-	mrs	x9, ttbr0_el2
+	mrs	x7, sctlr_el1
+	#mrs	x8, hcr_el1
+	mrs	x9, ttbr0_el1
 
 	stp x2, x0, [sp, #-16]!
 	stp	x3, x1, [sp, #-16]!
@@ -173,10 +217,11 @@ _exception_entry:
 	ret
 
 _exception_exit:
-	add	sp, sp, #(8*8)
+	add	sp, sp, #(8*6)
 	ldp	x2, x0, [sp],#16
-
-	msr	elr_el2, x2
+	msr	spsr_el1, x0
+	ldp	x2, x0, [sp],#16
+	msr	elr_el1, x2
 
 	ldp	x1, x2, [sp],#16
 	ldp	x3, x4, [sp],#16
@@ -194,41 +239,3 @@ _exception_exit:
 	ldp	x27, x28, [sp],#16
 	ldp	x29, x30, [sp],#16
 	eret
-
-/*
-2:	mrs	x0, CurrentEL
-	cmp	x0, #4
-	beq	3f
-	ldr x1, =_start
-	msr	sp_el1, x1
-	ldr	x0, =_vectors
-	msr	vbar_el2, x0
-	armv8_switch_to_el1_m x0, x1
-*/
-
-/*
-	mrs	  x1, cnthctl_el2
-	orr	  x1, x1, #0x3
-	msr	  cnthctl_el2, x1
-	msr	  cntvoff_el2, xzr
-	mrs	  x1, midr_el1
-	mrs	  x2, mpidr_el1
-	msr	  vpidr_el2, x1
-	msr	  vmpidr_el2, x2
-	mov	  x2, #0x33ff
-	msr	  cptr_el2, x2
-	msr	  hstr_el2, xzr
-	mov	  x2, #3 << 20
-	msr	  cpacr_el1, x2
-	mov   x2, #(1 << 31)|(1 << 29)
-	orr   x2, x2, #(1 << 1)
-	msr   hcr_el2, x2
-	mov	  x2, #0x0800
-	movk  x2, #0x30d0, lsl #16
-	msr	  sctlr_el1, x2
-	mov   x0, #0x3c5
-	msr   spsr_el2, x0
-	ldr   x0, =start1
-	msr   elr_el2, x0
-	eret
-*/

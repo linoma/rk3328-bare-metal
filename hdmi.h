@@ -550,16 +550,16 @@ enum{
 #define I2C_M_RECV_LEN		0x0400	/* length will be first received byte */
 
 struct i2c_msg {
-	u8 addr;
+	u8 *buf;
 	u16 flags;
 	u16 len;
-	u8 *buf;
+	u8 addr;
 };
 
 struct i2c{
-	u8 is_segment,is_regaddr,cmp;
-	u16 slave_reg;
 	u32 stat;
+	u16 slave_reg;
+	u8 is_segment,is_regaddr,cmp;
 };
 
 struct est_timings {
@@ -696,7 +696,7 @@ struct edid {
 
 int drm_do_probe_ddc_edid(u8 *buf, unsigned int block, int len);
 int inno_hdmi_phy_rk3328_init();
-int dw_hdmi_i2c_init();
+int hdmi_i2c_init();
 int inno_hdmi_phy_rk3328_power_on();
 int initialize_hdmi_ih_mutes();
 struct edid *drm_do_get_edid(u8 *data);

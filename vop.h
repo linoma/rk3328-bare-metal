@@ -19,6 +19,10 @@
 #define VOP_INTR_EN0				0xe0
 #define VOP_INTR_CLEAR0				0xe4
 #define VOP_INTR_STATUS0			0xe8
+#define VOP_INTR_RAW_STATUS0		0x000000ec
+#define VOP_INTR_EN1				0x000000f0
+#define VOP_INTR_CLEAR1				0x000000f4
+#define VOP_INTR_STATUS1			0x000000f8
 
 #define VOP_WIN0_CTRL0				0x00000100
 #define VOP_WIN0_CTRL1				0x00000104
@@ -136,7 +140,7 @@
 
 
 #define VOP_REGW(a) REGW(VOP_BASE + a)
-#define VOP_REG_SET(a,b,c,value) REG_SET((VOP_BASE+(a)),b,c,value,u32)
+#define VOP_REG_SET(a,b,shift,value) REG_SET((VOP_BASE+(a)),b,shift,value,u32)
 #define VOP_WIN_REG(w,reg,b,c,value) VOP_REG_SET(VOP_WIN0_CTRL0+(w*0x100)+(reg-0x100),b,c,value)
 
 #define VOP_WIN_ENABLE(w,v) VOP_WIN_REG(w,VOP_WIN0_CTRL0,0x1,0x0,v);
@@ -147,6 +151,26 @@
 
 
 #define VOP_CONFIG_DONE() VOP_REG_SET(VOP_CFG_DONE,0x1,0x0,0x1);
+
+/* interrupt define */
+#define DSP_HOLD_VALID_INTR		BIT(0)
+#define FS_INTR					BIT(1)
+#define LINE_FLAG_INTR			BIT(2)
+#define BUS_ERROR_INTR			BIT(3)
+#define FS_NEW_INTR				BIT(4)
+#define ADDR_SAME_INTR			BIT(5)
+#define LINE_FLAG1_INTR			BIT(6)
+#define WIN0_EMPTY_INTR			BIT(7)
+#define WIN1_EMPTY_INTR			BIT(8)
+#define WIN2_EMPTY_INTR			BIT(9)
+#define WIN3_EMPTY_INTR			BIT(10)
+#define HWC_EMPTY_INTR			BIT(11)
+#define POST_BUF_EMPTY_INTR		BIT(12)//0x1000
+#define PWM_GEN_INTR			BIT(13)
+#define DMA_FINISH_INTR			BIT(14)
+#define FS_FIELD_INTR			BIT(15)//0x8000
+#define FE_INTR					BIT(16)
+
 
 int vop_init();
 int vop_enable();

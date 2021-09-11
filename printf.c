@@ -107,7 +107,9 @@ unsigned int sprintf(char *dst, char* fmt, ...){
 void printf(char *fmt, ...) {
 	__builtin_va_list args;
     __builtin_va_start(args, fmt);
-    char *s = (char*)_mem;
+
+    char *s;
+    s = (char *)_mem;
     vsprintf(s,fmt,args);
     while(*s) {
         if(*s=='\n')

@@ -122,7 +122,7 @@ int initialize_hdmi_ih_mutes(){
 	return 0;
 }
 
-int dw_hdmi_i2c_init(){
+int hdmi_i2c_init(){
 	HDMI_REGW(HDMI_I2CM_SOFTRSTZ) = 0x00;
 	//HDMI_REG_SET(HDMI_I2CM_DIV,1,HDMI_I2CM_DIV_FAST_STD_MODE,HDMI_I2CM_DIV_STD_MODE);
 	HDMI_REGW(HDMI_I2CM_DIV) = 0x3;
@@ -141,7 +141,7 @@ int dw_hdmi_i2c_init(){
 
 static int hdmi_wait_i2c_done(struct i2c *i2c,u32 msec){
 	while(msec) {
-		u32 w = msec > 100 ? 100 : msec;
+		u32 w = msec > 200 ? 200 : msec;
 		udelay(w);
 		i2c->stat = HDMI_REGW(HDMI_IH_I2CM_STAT0);
 		if (i2c->stat)
@@ -160,7 +160,6 @@ static int hdmi_i2c_read(struct i2c *i2c, unsigned char *buf, unsigned int lengt
 		i2c->slave_reg = 0x00;
 		i2c->is_regaddr = 1;
 	}
-
 	while (length--) {
 		HDMI_REGW(HDMI_I2CM_ADDRESS) = i2c->slave_reg++;
 		if (i2c->is_segment)
@@ -214,7 +213,6 @@ int hdmi_i2c_xfer(struct i2c_msg *msgs, int num){
 	if (addr == DDC_SEGMENT_ADDR && msgs[0].len == 1)
 		addr = DDC_ADDR;
 	HDMI_REGW(HDMI_I2CM_SLAVE) = addr;
-
 	for (i = 0; i < num; i++) {
 		if (msgs[i].addr == DDC_SEGMENT_ADDR && msgs[i].len == 1) {
 			i2c.is_segment = 1;
@@ -259,16 +257,15 @@ struct edid *drm_do_get_edid(u8 *data){
 }
 
 int drm_do_probe_ddc_edid(u8 *buf, unsigned int block, int len){
-	unsigned char start = block * HDMI_EDID_LEN;
-	unsigned char segment = block >> 1;
-	unsigned char xfers = segment ? 3 : 2;
+	u8 start = block * HDMI_EDID_LEN;
+	u8 segment = block >> 1;
+	u8 xfers = segment ? 3 : 2;
 	int ret, retries = 5;
 
 	if(HDMI_REGW(HDMI_PHY_STAT0) & HDMI_PHY_HPD)
 		REGW(GRF_BASE+RK3328_GRF_SOC_CON4)=RK3328_IO_5V_DOMAIN;
 	else
 		REGW(GRF_BASE+RK3328_GRF_SOC_CON4)=RK3328_IO_3V_DOMAIN;
-
 	do {
 		struct i2c_msg msgs[] = {
 			{

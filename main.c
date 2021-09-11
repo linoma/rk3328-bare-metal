@@ -8,25 +8,15 @@
 #include "printf.h"
 #include "sdmmc.h"
 #include "gic.h"
+#include "mmu.h"
 
-#define  GRF_GPIO4B_IOMUX			(*(volatile unsigned int *)(GRF_BASE + 0xe024))
-
-#define  GPIO0_BASE                	0xff210000
-#define  GPIO1_BASE                	0xff220000
-#define  GPIO2_BASE                	0xff230000
-#define  GPIO3_BASE                	0xff240000
-
-#define GPIO0                   ((p_gpio_reg)GPIO0_BASE)
-#define GPIO1                   ((p_gpio_reg)GPIO1_BASE)
-#define GPIO2                   ((p_gpio_reg)GPIO2_BASE)
-#define GPIO3                   ((p_gpio_reg)GPIO3_BASE)
-#define GPIO4                   ((p_gpio_reg)GPIO4_BASE)
 
 #define HZ	1000
 
 extern volatile u8 _end;
+extern volatile u32 __bss_size;
 
-u8 *_mem = (u8 *)&_end;
+u8 *_mem = NULL;
 u32 _arch_cntfreq,_usec_factor,_msec_factor;
 u64 _start_tick;
 u32 _lino = 0;
@@ -37,24 +27,33 @@ void NOINLINE mdelay(u32 msec){
 	udelay(msec*1000);
 }
 
+NOINLINE u64 read_mpidr(void){
+	u64 val;
+
+	asm volatile("mrs %0, mpidr_el1" : "=r" (val));
+	return val;
+}
+
 static INLINE u32 arch_timer_get_cntfrq(void){
 	u32 val;
-	asm volatile("mrs %0,   cntfrq_el0" : "=r" (val));
+
+	asm volatile("mrs %0, cntfrq_el0" : "=r" (val));
 	return val;
 }
 
-static NOINLINE u32 arch_get_el(void){
+NOINLINE u32 arch_get_el(void){
 	u32 val;
+
 	asm volatile("mrs %0,CurrentEL" : "=r" (val));
-	return val;
+	return val>>2;
 }
 
-static inline void arch_local_irq_enable(void){
-	asm volatile("msr daifclr, #15" : :	: "memory");
+INLINE void arch_local_irq_enable(void){
+	asm volatile("msr daifclr, #2" : :	: "memory");
 }
 
-static inline void arch_local_irq_disable(void){
-	asm volatile("msr daifset, #15" : : : "memory");
+INLINE void arch_local_irq_disable(void){
+	asm volatile("msr daifset, #2" : : : "memory");
 }
 
 void NOINLINE syscall(u32 val){
@@ -81,105 +80,20 @@ void prepare_frame(){
 	__flush_dcache_area(p,1280*4*1024);
 }
 
-int lino(){
-	VOP_REG_SET(VOP_INTR_CLEAR0,0x1000,0x0,0x1000);
-	VOP_REG_SET(VOP_SYS_CTRL1,0x1,0x1c,0x0);
-	VOP_REG_SET(VOP_SYS_CTRL1,0x1,0x1b,0x0);
 
-	//VOP_REG_SET(VOP_DSP_BG,0xffffffff,0x0,0x801080);
-	VOP_REGW(VOP_WIN0_YRGB_MST)=(u32)0x4000000;
-
-	VOP_REG_SET(VOP_WIN0_CTRL0,0x1,0x15,0x0);
-	VOP_REG_SET(VOP_WIN0_CTRL0,0x1,0x16,0x0);
-	//VOP_REG_SET(VOP_WIN0_CTRL0,0x7,0x1,0x0);//format
-
-	VOP_REG_SET(VOP_WIN0_VIR,0x3fff,0x0,0x500);//pitch
-
-	//VOP_REG_SET(0x110,0xffffffff,0,0x0);
-	VOP_REG_SET(VOP_WIN0_CTRL0,0x7,0x4,0x0);
-	VOP_REG_SET(VOP_WIN0_CTRL0,0x7,0x5,0x4);
-	VOP_REG_SET(VOP_WIN0_SCL_FACTOR_YRGB,0xffff,0x0,0x1000);
-	VOP_REG_SET(VOP_WIN0_SCL_FACTOR_YRGB,0xffff,0x10,0x1000);
-	VOP_REG_SET(VOP_WIN0_CTRL1,0x1,0x4,0x0);
-	VOP_REG_SET(VOP_WIN0_CTRL1,0x1,0x5,0x0);
-	VOP_REG_SET(VOP_WIN0_CTRL1,0x3,0x10,0x0);
-	VOP_REG_SET(VOP_WIN0_CTRL1,0x3,0x12,0x0);
-	VOP_REG_SET(VOP_WIN0_CTRL1,0x3,0x14,0x0);
-	VOP_REG_SET(VOP_WIN0_CTRL1,0x1,0x17,0x0);
-	VOP_REG_SET(VOP_WIN0_CTRL1,0x1,0x16,0x1);
-
-	//VOP_REG_SET(VOP_WIN0_ACT_INFO,0x1fff1fff,0x0,0x3ff04ff);
-	//VOP_REG_SET(VOP_WIN0_DSP_INFO,0xfff0fff,0x0,0x3ff04ff);
-	VOP_WIN_SIZE(0,1280,1024,0);
-
-	VOP_REG_SET(VOP_WIN0_DSP_ST,0x1fff1fff,0x0,0x290168);
-	//VOP_REG_SET(VOP_WIN0_DSP_ST,0x1fff1fff,0x0,0);
-
-	VOP_REG_SET(VOP_WIN0_CTRL0,0x1,0xc,0x0);
-	VOP_REG_SET(VOP_WIN0_SRC_ALPHA_CTRL,0xffff,0x0,0x0);
-	VOP_REG_SET(VOP_WIN0_SRC_ALPHA_CTRL,0xff,0x10,0xff);
-	VOP_REG_SET(VOP_WIN0_CTRL0,0x3,0xa,0x0);
-
-	VOP_REG_SET(VOP_SDR2HDR_CTRL,0x1,0x9,0x0);
-	VOP_REG_SET(VOP_SDR2HDR_CTRL,0x1,0x5,0x0);
-	VOP_REG_SET(VOP_SDR2HDR_CTRL,0x1,0x8,0x0);
-
-	VOP_REG_SET(VOP_DSP_CTRL0,0x1f,0xc,0x0);
-	VOP_REG_SET(VOP_DSP_CTRL0,0xf,0x0,0xf);//outmode
-	VOP_REG_SET(VOP_DSP_CTRL1,0x1,0x2,0x0);//dither
-	VOP_REG_SET(VOP_DSP_CTRL1,0x1,0x1,0x0);
-	VOP_REG_SET(VOP_DSP_CTRL1,0x1,0x4,0x0);
-
-	VOP_REG_SET(VOP_DSP_CTRL0,0x1,0x8,0x0);
-	VOP_REG_SET(VOP_SYS_CTRL,0x1,0x10,0x0);//overlay
-	VOP_REG_SET(VOP_POST_SCL_CTRL,0x1,0x2,0x0);//dsp_out_yuv
-
-	VOP_REG_SET(VOP_DSP_BG,0xffffffff,0x0,0x0);
-	VOP_REG_SET(VOP_BCSH_CTRL,0x1,0x4,0x0);
-	VOP_REG_SET(VOP_BCSH_CTRL,0x1,0x0,0x0);
-	VOP_REG_SET(VOP_BCSH_CTRL,0x3,0x6,0x1);
-	VOP_REG_SET(VOP_BCSH_CTRL,0x3,0x2,0x1);
-	VOP_REG_SET(0x640,0x1,0x0,0x0);
-	VOP_REG_SET(VOP_DSP_CTRL1,0xff,0x8,1);//dsp_layer_sel
-
-	VOP_REG_SET(0x600,0x1fff1fff,0x0,0x1680668);
-	VOP_REG_SET(0x604,0x1fff1fff,0x0,0x290429);
-	VOP_REG_SET(0x608,0xffffffff,0x0,0x10001000);
-	VOP_REG_SET(VOP_POST_SCL_CTRL,0x3,0x0,0x0);
-	VOP_REG_SET(0xa10,0x1,0x0,0x0);
-	VOP_REG_SET(VOP_SDR2HDR_CTRL,0x1,0x0,0x0);
-	VOP_REG_SET(VOP_SDR2HDR_CTRL,0x1,0x4,0x0);
-	VOP_REG_SET(VOP_SDR2HDR_CTRL,0x1,0x1,0x0);
-	VOP_REG_SET(VOP_SDR2HDR_CTRL,0x1,0x2,0x0);
-	VOP_REG_SET(VOP_SDR2HDR_CTRL,0x1,0x3,0x0);
-	VOP_REG_SET(VOP_SDR2HDR_CTRL,0x1,0x5,0x0);
-	VOP_REG_SET(VOP_SDR2HDR_CTRL,0x1,0x6,0x0);
-	VOP_REG_SET(VOP_SDR2HDR_CTRL,0x1,0x7,0x0);
-	VOP_REG_SET(VOP_SDR2HDR_CTRL,0x1,0x1f,0x1);
-
-	VOP_WIN_ENABLE(0,1);
-
-	VOP_CONFIG_DONE();
-
+static int hdmi_irq_handle(){
+	printf("hdmi irq\n");
 	return 0;
 }
 
 void main(){
 	u32 l;
 
-	/*GPIO0->SWPORTA_DDR |=  (0x01 << (1 * 8 + 5));
-    GPIO2->SWPORTA_DDR |=  (0x01 << (3 * 8 + 3));
+	_mem = (u8 *)&_end;
+	rk_uart_init();
+	printf("EL %x %d\n",arch_get_el(),sizeof(struct i2c));
 
-    GPIO0->SWPORTA_DR  &= ~(0x01 << (1 * 8 + 5));
-    GPIO2->SWPORTA_DR  &= ~(0x01 << (3 * 8 + 3));
-
-	GPIO2->SWPORTA_DR  |=  (0x01 << (3 * 8 + 3));
-
-	GRF_GPIO4B_IOMUX = (3 << 18) | (3 << 16) | (2 << 2) | (2 << 0);*/
-
-    /*UART2_SFE = 0x01;
-    UART2_SRT = 0x03;
-    UART2_STET = 0x01;*/
+	//mmu_init();
 
 	_arch_cntfreq = arch_timer_get_cntfrq();
 	_msec_factor = (_arch_cntfreq / 1000);
@@ -187,18 +101,18 @@ void main(){
 	_start_tick = get_cycles();
 
 	gic_init();
+	arch_local_irq_enable();
 
-	syscall(1);
+	gic_register_irq_routine(32+35,hdmi_irq_handle,IRQ_TYPE_LEVEL_HIGH);
+	gic_register_irq_routine(32+71,hdmi_irq_handle,IRQ_TYPE_LEVEL_HIGH);
+	gic_register_irq_routine(115,hdmi_irq_handle,IRQ_TYPE_LEVEL_HIGH);
 
+	//syscall(1);
 	sdmmc_init();
-
 	inno_hdmi_phy_rk3328_init();
-
 	//prod_id0 = hdmi_readb(hdmi, HDMI_PRODUCT_ID0);
 	//prod_id1 = hdmi_readb(hdmi, HDMI_PRODUCT_ID1);
-
 	initialize_hdmi_ih_mutes();
-
 	//hdmi_set_cts_n
 	HDMI_REG_UPD(HDMI_AUD_CTS3,HDMI_AUD_CTS3_CTS_MANUAL,0);
 	HDMI_REG_UPD(HDMI_AUD_CTS3,HDMI_AUD_CTS3_N_SHIFT_MASK,0);
@@ -227,14 +141,13 @@ void main(){
 	HDMI_REGW(HDMI_IH_PHY_STAT0) = 0x3;
 	HDMI_REGW(HDMI_IH_MUTE_PHY_STAT0) = 0xc2;
 
-	dw_hdmi_i2c_init();
-
+	hdmi_i2c_init();
 	struct edid *p = drm_do_get_edid(_mem);
 	if(p != NULL)
 		printf("edit %d %d\n",p->width_cm,p->height_cm);
 	vop_init();
-	inno_hdmi_phy_rk3328_pre_pll_update();
 
+	inno_hdmi_phy_rk3328_pre_pll_update();
     VOP_REG_SET(VOP_CFG_DONE,0x1,0x0,0x1);
 
 	HDMI_REGW(HDMI_IH_MUTE_FC_STAT2) = HDMI_IH_MUTE_FC_STAT2_OVERFLOW_MASK;
@@ -334,20 +247,30 @@ void main(){
 	vop_enable();
 	prepare_frame();
 
-	VOP_REG_SET(VOP_INTR_CLEAR0,0x1fe3,0x0,0x1fe0);
-	VOP_REG_SET(VOP_INTR_EN0,0x1fe3,0x0,0x1fF0);
-	VOP_REG_SET(VOP_INTR_CLEAR0,0x1fe3,0x0,0x1fe0);
+	VOP_REG_SET(VOP_SYS_CTRL,0x1,0x15,0x0);//dma stop
 	VOP_REG_SET(VOP_WIN0_CTRL0,0x1,0x9,0x0); //axi
 
 	VOP_CONFIG_DONE();
+
 	printf("done %x\n",_lino);
+
+	VOP_REGW(VOP_WIN0_YRGB_MST)=(u32)0x4000000;
+	VOP_WIN_SIZE(0,1280,1024,0);
+	VOP_WIN_ENABLE(0,1);
+	VOP_REG_SET(VOP_DSP_CTRL0,0xf,0x0,15);//outmode
+	VOP_CONFIG_DONE();
+
 	while(1){
-		int i=0;
-		l = VOP_REGW(VOP_INTR_STATUS0);
-		VOP_REGW(VOP_INTR_CLEAR0) = l;
-		if(l)
-			printf("irq %x %x\n",l,_lino);
-		lino();
+		u32 i=0;
+			if((l = (u32)(u16)VOP_REGW(VOP_INTR_STATUS0))){
+				VOP_REGW(VOP_INTR_CLEAR0) = l|0xffff0000;
+				if((l & 0x1000) ){
+								VOP_REG_SET(VOP_SYS_CTRL1,0x1,0x1c,0x0);
+				VOP_REG_SET(VOP_SYS_CTRL1,0x1,0x1b,0x0);
+
+				printf("l %x %x %d\n",l,i,_lino);
+			}
+		}
 	}
 }
 
@@ -374,6 +297,7 @@ void NOINLINE udelay(u32 usec){
 }
 
 void exc_handler(unsigned long *type){
+	//printf("exc_handler\n");
 	_lino++;
 }
 
@@ -395,4 +319,48 @@ void NOINLINE memset(void *dst,u32 val,u32 size){
 	}
 	for(;s > 0;s--)
 		*d++ = val;
+}
+
+int unlockMutex(u32 mutex){
+	asm volatile
+	(
+		"mov x1, %0\n"
+		"stlr wzr, [x1]\n"
+
+		: : "r" ((u32 *) &mutex) : "x1"
+	);
+	return 0;
+}
+
+int lockMutex(u32 mutex){
+	asm volatile
+	(
+		"mov x1, %0\n"
+		"mov w2, #1\n"
+		"prfm pstl1keep, [x1]\n"
+		"1: ldaxr w3, [x1]\n"
+		"cbnz w3, 1b\n"
+		"stxr w3, w2, [x1]\n"
+		"cbnz w3, 1b\n"
+
+		: : "r" ((u32 *) &mutex) : "x1", "x2", "x3"
+	);
+	return 0;
+}
+
+void EnterCritical (unsigned nTargetLevel){
+	u32 nFlags;
+
+	asm volatile ("mrs %0, daif" : "=r" (nFlags));
+	asm volatile ("msr DAIFSet, #3");	// disable both IRQ and FIQ
+	dmb (ISHLD);
+}
+
+void LeaveCritical (void)
+{
+	dmb (ISHLD);
+
+	u32 nFlags = 0;//s_nFlags[--s_nCriticalLevel];
+
+	asm volatile ("msr daif, %0" :: "r" (nFlags));
 }

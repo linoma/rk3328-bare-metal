@@ -1,4 +1,5 @@
 #include "sdmmc.h"
+#include "gic.h"
 #include "printf.h"
 
 static int reset_dma(){
@@ -63,6 +64,10 @@ static int init_dma(){
 	return 0;
 }
 
+static int sdmcc_irq(){
+	return 0;
+}
+
 int sdmmc_init(){
 	u32 hcon = REGW(SDMMC_BASE+SDMMC_HCON);
 	u32 verid = REGW(SDMMC_BASE+SDMMC_VERID);
@@ -78,7 +83,7 @@ int sdmmc_init(){
 	REGW(SDMMC_BASE+SDMMC_RINTSTS)= 0xFFFFFFFF;
 	REGW(SDMMC_BASE+SDMMC_INTMASK)= SDMMC_INT_CMD_DONE | SDMMC_INT_DATA_OVER | SDMMC_INT_TXDR | SDMMC_INT_RXDR | DW_MCI_ERROR_FLAGS;
 	REGW(SDMMC_BASE+SDMMC_CTRL) = SDMMC_CTRL_INT_ENABLE;
-
+	gic_register_irq_routine(32+12,sdmcc_irq,IRQ_TYPE_LEVEL_HIGH);
 	init_dma();
 	return 0;
 }

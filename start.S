@@ -83,10 +83,7 @@
 	ldr	\tmp, =(HCR_EL2_RW_AARCH32 | HCR_EL2_HCD_DIS)
 	msr	hcr_el2, \tmp
 
-	ldr	\tmp, =(SPSR_EL_END_LE | SPSR_EL_ASYN_MASK |\
-			SPSR_EL_IRQ_MASK | SPSR_EL_FIQ_MASK |\
-			SPSR_EL_T_A32 | SPSR_EL_M_AARCH32 |\
-			SPSR_EL_M_SVC)
+	ldr	\tmp, =(SPSR_EL_END_LE | SPSR_EL_ASYN_MASK | SPSR_EL_IRQ_MASK | SPSR_EL_FIQ_MASK | SPSR_EL_T_A32 | SPSR_EL_M_AARCH32 | SPSR_EL_M_SVC)
 	msr     spsr_el2, \tmp
 	msr     elr_el2, \ep
 	eret

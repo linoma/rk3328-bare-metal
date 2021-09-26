@@ -28,7 +28,7 @@ SRCS = $(wildcard *.c)
 OBJS = $(SRCS:.c=.o)
 OBJS += cache.o
 
-CFLAGS = -Wno-int-to-pointer-cast -O2 -ffreestanding -fno-stack-protector -nostdinc -nostdlib -nostartfiles -march=armv8-a -fno-pie -save-temps
+CFLAGS = -Wno-int-to-pointer-cast -O2 -ffreestanding -fno-stack-protector -nostdinc -nostdlib -nostartfiles -march=armv8-a -fno-pie
 TARGET_USER	= kernel.elf
 TARGET_KERN = kernel
 

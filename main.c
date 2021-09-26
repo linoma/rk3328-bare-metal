@@ -82,7 +82,7 @@ void prepare_frame(){
 
 
 static int hdmi_irq_handle(){
-	printf("hdmi irq\n");
+	//printf("hdmi irq\n");
 	return 0;
 }
 
@@ -103,9 +103,9 @@ void main(){
 	gic_init();
 	arch_local_irq_enable();
 
-	gic_register_irq_routine(32+35,hdmi_irq_handle,IRQ_TYPE_LEVEL_HIGH);
+	//gic_register_irq_routine(32+35,hdmi_irq_handle,IRQ_TYPE_LEVEL_HIGH);
 	gic_register_irq_routine(32+71,hdmi_irq_handle,IRQ_TYPE_LEVEL_HIGH);
-	gic_register_irq_routine(115,hdmi_irq_handle,IRQ_TYPE_LEVEL_HIGH);
+	gic_register_irq_routine(32+83,hdmi_irq_handle,IRQ_TYPE_LEVEL_HIGH);//hdmyphy
 
 	//syscall(1);
 	sdmmc_init();
@@ -142,13 +142,14 @@ void main(){
 	HDMI_REGW(HDMI_IH_MUTE_PHY_STAT0) = 0xc2;
 
 	hdmi_i2c_init();
+
 	struct edid *p = drm_do_get_edid(_mem);
 	if(p != NULL)
 		printf("edit %d %d\n",p->width_cm,p->height_cm);
 	vop_init();
 
 	inno_hdmi_phy_rk3328_pre_pll_update();
-    VOP_REG_SET(VOP_CFG_DONE,0x1,0x0,0x1);
+    VOP_CONFIG_DONE();
 
 	HDMI_REGW(HDMI_IH_MUTE_FC_STAT2) = HDMI_IH_MUTE_FC_STAT2_OVERFLOW_MASK;
 
@@ -262,13 +263,13 @@ void main(){
 
 	while(1){
 		u32 i=0;
-			if((l = (u32)(u16)VOP_REGW(VOP_INTR_STATUS0))){
-				VOP_REGW(VOP_INTR_CLEAR0) = l|0xffff0000;
-				if((l & 0x1000) ){
-								VOP_REG_SET(VOP_SYS_CTRL1,0x1,0x1c,0x0);
-				VOP_REG_SET(VOP_SYS_CTRL1,0x1,0x1b,0x0);
+		if((l = (u32)(u16)VOP_REGW(VOP_INTR_STATUS0))){
+			VOP_REGW(VOP_INTR_CLEAR0) = l|0xffff0000;
+			if((l & 0x1000) ){
+				VOP_REG_SET(VOP_SYS_CTRL1,0x3,0x1b,0x0);
+//				VOP_REG_SET(VOP_SYS_CTRL1,0x1,0x1b,0x0);
 
-				printf("l %x %x %d\n",l,i,_lino);
+				//printf("l %x %x %d\n",l,i,_lino);
 			}
 		}
 	}
@@ -297,7 +298,8 @@ void NOINLINE udelay(u32 usec){
 }
 
 void exc_handler(unsigned long *type){
-	//printf("exc_handler\n");
+	if(_lino < 5)
+		printf("exc_handler\n");
 	_lino++;
 }
 

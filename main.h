@@ -29,7 +29,6 @@ typedef signed short __le16;
 #define HDMI_BASE 					0xFF3C0000
 #define GPU_BASE 					0xFF300000 //0xffa30000 ff300000
 #define HDMIPHY_BASE				0xFF430000
-#define SDMMC_BASE					0xFF500000
 #define SDIO_BASE					0xFF510000
 #define EMMC_BASE					0xFF520000
 #define GIC_BASE					0xFF811000
@@ -45,7 +44,9 @@ typedef signed short __le16;
 #define isb()		asm volatile("isb" : : : "memory")
 #define dsb(option) __asm__ __volatile__ ("dsb " #option : : : "memory")
 #define dmb(option) __asm__ __volatile__ ("dmb " #option : : : "memory")
-
+#define mb()		dsb(sy)
+#define rmb()		dsb(ld)
+#define wmb()		dsb(st)
 
 s64 __div(s64 v,s64 d);
 u64 get_cycles(void);

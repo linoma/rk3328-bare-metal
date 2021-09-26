@@ -4,8 +4,7 @@ static LPIRQFUNC irq_map[128]={0};
 extern u32 _lino;
 
 static void gic_poke_irq(u32 d,u32 offset){
-	u32 val = REGW(GIC_BASE+offset + ((d / 32) * 4));
-	REGW(GIC_BASE+offset + ((d / 32) * 4)) = val | (1 << (d % 32));
+	REGW(GIC_BASE+offset + ((d / 32) * 4)) |= (1 << (d % 32));
 }
 
 static void gic_group_irq(u32 d,u32 flag){
@@ -41,18 +40,16 @@ int gic_fiq_handler(u64 *regs){
 int gic_irq_handler(u64 *regs){
 	u32 irqstat,irqnr;
 
-	_lino++;
-	printf("gic_irq_handler\n");
 	irqstat = REGW(GIC_BASE+GIC_CPU_INTACK);
 	irqnr = irqstat & GICC_IAR_INT_ID_MASK;
-	REGW(GIC_BASE + GIC_CPU_EOI) = irqstat;
-
+	printf("IRQ %d\n",irqnr);
 	if(irqnr > 15 && irqnr < 1020){
-		printf("IRQ %d %x\n",irqnr,irqstat);
 		if(irq_map[irqnr])
 			irq_map[irqnr]();
+		REGW(GIC_BASE + GIC_CPU_EOI) = irqstat;
 	}
-	else {
+	else if(irqnr < 1020) {
+		REGW(GIC_BASE + GIC_CPU_EOI) = irqstat;
 		REGW(GIC_BASE + GIC_CPU_DEACTIVATE) = irqstat;
 	}
 	return 0;
@@ -61,41 +58,38 @@ int gic_irq_handler(u64 *regs){
 int gic_init(){
 	u32 gic_irqs,val,i;
 
-	printf("GIC: %x %x\n",REGW(GIC_BASE+GIC_DIST_CTR),REGW(GIC_BASE+GIC_CPU_CTRL));
-
 	gic_irqs = (REGW(GIC_BASE+GIC_DIST_CTR) & 0x1f) * 32;
+	printf("GIC: %x %x %d %d\n",REGW(GIC_BASE+GIC_DIST_CTR),REGW(GIC_BASE+GIC_CPU_CTRL),gic_irqs,(REGW(GIC_BASE+GIC_DIST_PIDR2_GICV2) >> 4) & 0xf);
 
 	//initialize dist interface
-	REGW(GIC_BASE+GIC_DIST_CTRL) = GICD_DISABLE;
-
+	REGW(GIC_BASE+GIC_DIST_CTRL) = GIC_DISABLE;
 	for (i = 32; i < gic_irqs; i += 4)
-		REGW(GIC_BASE+ GIC_DIST_TARGET + i * 4 / 4) = 0x01010101;
+		REGW(GIC_BASE+ GIC_DIST_TARGET + ((i / 4) * 4)) = 0x01010101;
 
 	for (i = 32; i < gic_irqs; i += 16)
-		REGW(GIC_BASE+ GIC_DIST_CONFIG + i / 4) = GICD_INT_ACTLOW_LVLTRIG;
+		REGW(GIC_BASE + GIC_DIST_CONFIG + i / 4) = GICD_INT_ACTLOW_LVLTRIG;
 
 	for (i = 32; i < gic_irqs; i += 4)
-		REGW(GIC_BASE+ GIC_DIST_PRI + i) = GICD_INT_DEF_PRI_X4;
+		REGW(GIC_BASE + GIC_DIST_PRI + i) = GICD_INT_DEF_PRI_X4;
 
 	for (i = 32; i < gic_irqs; i += 32) {
-		REGW(GIC_BASE+ GIC_DIST_ACTIVE_CLEAR + i / 8) = GICD_INT_EN_CLR_X32;
-		REGW(GIC_BASE+ GIC_DIST_ENABLE_CLEAR + i / 8) = GICD_INT_EN_CLR_X32;
+		REGW(GIC_BASE + GIC_DIST_ACTIVE_CLEAR + i / 8) = GICD_INT_EN_CLR_X32;
+		REGW(GIC_BASE + GIC_DIST_ENABLE_CLEAR + i / 8) = GICD_INT_EN_CLR_X32;
 	}
-	REGW(GIC_BASE+GIC_DIST_CTRL) = GICD_ENABLE;
+	REGW(GIC_BASE+GIC_DIST_CTRL) = GIC_ENABLE;
 
 	val = REGW(GIC_BASE+GIC_CPU_CTRL);
-	REGW(GIC_BASE+GIC_CPU_CTRL) = val & ~(GICC_ENABLE|GICC_ENABLENS);
+	REGW(GIC_BASE+GIC_CPU_CTRL) = val & ~(GIC_ENABLE|GIC_ENABLENS);
 
 	//intialize cpu interface
-	REGW(GIC_BASE+ GIC_DIST_ACTIVE_CLEAR) = GICD_INT_EN_CLR_X32;
-	REGW(GIC_BASE+ GIC_DIST_ENABLE_CLEAR) = GICD_INT_EN_CLR_PPI;
-	REGW(GIC_BASE+ GIC_DIST_ENABLE_SET) = GICD_INT_EN_SET_SGI;
+	REGW(GIC_BASE + GIC_DIST_ACTIVE_CLEAR) = GICD_INT_EN_CLR_X32;
+	REGW(GIC_BASE + GIC_DIST_ENABLE_CLEAR) = GICD_INT_EN_CLR_PPI;
+	REGW(GIC_BASE + GIC_DIST_ENABLE_SET) = GICD_INT_EN_SET_SGI;
 	for (i = 0; i < 32; i += 4)
-		REGW(GIC_BASE+ GIC_DIST_PRI + i * 4 / 4) = GICD_INT_DEF_PRI_X4;
+		REGW(GIC_BASE+ GIC_DIST_PRI + ((i / 4) * 4)) = GICD_INT_DEF_PRI_X4;
 
 	REGW(GIC_BASE+GIC_CPU_PRIMASK) = GICC_INT_PRI_THRESHOLD;
-	val = REGW(GIC_BASE+GIC_CPU_CTRL) & ~(GICC_ENABLE|GICC_ENABLENS);
-	REGW(GIC_BASE+GIC_CPU_CTRL) = val | GICC_ENABLE;
+	REGW(GIC_BASE+GIC_CPU_CTRL) = GIC_ENABLE;
 
 	return 0;
 }
@@ -124,7 +118,12 @@ int gic_configure_irq(unsigned int irq, unsigned int type){
 int gic_register_irq_routine(u32 irq,LPIRQFUNC p,u32 type){
 	irq_map[irq] = p;
 	int i = gic_configure_irq(irq,type);
-	REGW(GIC_BASE+GIC_DIST_ENABLE_SET + ((irq / 32) * 4)) = 1 << (irq % 32);
+	//REGW(GIC_BASE+GIC_DIST_IGROUP + ((irq/32) * 4)) &= ~(1 << (irq % 32));
+
+	gic_poke_irq(irq,GIC_DIST_ENABLE_SET);
+	//gic_poke_irq(irq,GIC_DIST_ACTIVE_SET);
+	//REGW(GIC_BASE+GIC_CPU_EOI)=irq;
+
 	printf("GIC %d=>%d\n",irq,i);
 	return 0;
 }
